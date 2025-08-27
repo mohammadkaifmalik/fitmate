@@ -36,3 +36,4 @@ The client expects the API at `http://localhost:4000`. Change it in `src/lib/api
 ## Notes
 - Replace mocked data and auth with your real logic.
 - Components are modular and ready to extend.
+# fitmate
