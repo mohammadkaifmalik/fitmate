@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+body { @apply bg-slate-100 text-slate-900; }
+.sidebar-link { @apply flex items-center gap-3 px-4 py-2 rounded-xl hover:bg-slate-800/60; }
+.card { @apply bg-white rounded-2xl shadow-sm border border-slate-200; }
+.card-pad { @apply p-5; }
+/* index.css */
+@media (max-width: 360px) {
+    .card-pad { padding: 1rem; }
+  }
+  
