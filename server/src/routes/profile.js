@@ -153,12 +153,16 @@ Keep daily calories near target. Provide 5–7 workouts and ~3–4 meals per day
   async function callHF() {
     const r = await fetch(url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`, "Content-Type":"application/json" },
       body: JSON.stringify(payload),
     });
     const text = await r.text();
     return { ok: r.ok, status: r.status, text };
   }
+  console.log("[/generate] model:", process.env.HUGGINGFACE_MODEL, "key?", !!process.env.HUGGINGFACE_API_KEY);
+  console.log("[/generate] key length:", (process.env.HUGGINGFACE_API_KEY || "").length);
+
+
 
   try {
     let { ok, status, text } = await callHF();
