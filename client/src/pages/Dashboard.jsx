@@ -1,9 +1,13 @@
 import React from "react";
 import Card from "../components/Card.jsx";
+import { useAuth } from "../context/AuthContext";
+import { api, setAuth } from "../lib/api";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from "recharts";
+
+setAuth(localStorage.getItem("fitmate_token"));
 
 const weekly = [
   { day: "Mon", value: 20 },
@@ -23,6 +27,10 @@ const breakdown = [
 ];
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const kcal = user?.caloriesTarget ?? 1800;
+  const goal = user?.profile?.goal ?? "maintain";
+
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
@@ -31,8 +39,8 @@ export default function Dashboard() {
           <div className="text-slate-600 mt-1">45 min</div>
         </Card>
         <Card title="Today's Meal Plan">
-          <div className="text-2xl font-semibold">Calorie Deficit</div>
-          <div className="text-slate-600 mt-1">1800 kcal</div>
+          <div className="text-2xl font-semibold capitalize">{goal} plan</div>
+          <div className="text-slate-600 mt-1">{kcal} kcal</div>
         </Card>
       </div>
 

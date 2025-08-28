@@ -1,34 +1,68 @@
 import React from "react";
 import Card from "../components/Card";
-import BackToDashboard from "../components/BackToDashboard";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
+import { api } from "../lib/api";
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+} from "recharts";
 
-const data = [
-  { day: "Mon", weight: 80.2 },
-  { day: "Tue", weight: 80.0 },
-  { day: "Wed", weight: 79.9 },
-  { day: "Thu", weight: 79.8 },
-  { day: "Fri", weight: 79.6 },
-  { day: "Sat", weight: 79.5 },
-  { day: "Sun", weight: 79.4 },
-];
+function fmt(d) {
+  const dt = new Date(d);
+  return dt.toLocaleDateString([], { month: "short", day: "numeric" });
+}
 
 export default function Progress() {
+  const [logs, setLogs] = React.useState([]);
+  const [summary, setSummary] = React.useState(null);
+  const [err, setErr] = React.useState("");
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const [a, b] = await Promise.all([
+          api.get("/progress/weights", { params: { days: 90 } }),
+          api.get("/progress/summary"),
+        ]);
+        setLogs(a.data.logs || []);
+        setSummary(b.data || null);
+      } catch (e) {
+        setErr(e?.response?.data?.error || e.message);
+      }
+    })();
+  }, []);
+
   return (
-    <div className="space-y-4">
-      <BackToDashboard />
-      <h2 className="text-2xl font-semibold">Progress</h2>
-      <Card title="Weight (kg) — This Week">
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey="weight" dot />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+    <div className="space-y-6">
+      <Card title="Weight Trend (90 days)">
+        {err ? (
+          <div className="py-8 text-sm text-red-600">{err}</div>
+        ) : logs.length === 0 ? (
+          <div className="py-8 text-sm text-slate-600">No weight entries yet. Update your goal with your current weight to get started.</div>
+        ) : (
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={logs.map(l => ({ ...l, label: fmt(l.date) }))}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" />
+                <YAxis />
+                <Tooltip />
+                <Line type="monotone" dataKey="weightKg" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </Card>
+
+      <Card title="Summary">
+        {summary ? (
+          <div className="grid md:grid-cols-4 gap-4 text-sm">
+            <div><div className="text-slate-600">Start</div><div className="text-lg font-semibold">{summary.startWeightKg ?? "—"} kg</div></div>
+            <div><div className="text-slate-600">Latest</div><div className="text-lg font-semibold">{summary.latestWeightKg ?? "—"} kg</div></div>
+            <div><div className="text-slate-600">Change</div><div className="text-lg font-semibold">{summary.deltaKg ?? 0} kg</div></div>
+            <div><div className="text-slate-600">BMI</div><div className="text-lg font-semibold">{summary.bmi ?? "—"} ({summary.bmiCategory ?? "—"})</div></div>
+          </div>
+        ) : (
+          <div className="py-4 text-slate-600 text-sm">Loading…</div>
+        )}
       </Card>
     </div>
   );

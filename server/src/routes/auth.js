@@ -37,10 +37,13 @@ router.post("/login", async (req, res) => {
   res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
 });
 router.get("/me", auth, async (req, res) => {
-  const user = await User.findById(req.user.sub).select("name email caloriesTarget");
+  const user = await User.findById(req.user.sub)
+    .select("name email caloriesTarget profile"); // MUST include 'profile'
   if (!user) return res.status(404).json({ error: "User not found" });
+  console.log("GET /auth/me -> isComplete:", user.profile?.isComplete); // debug
   res.json({ user });
 });
+
 
 
 export default router;

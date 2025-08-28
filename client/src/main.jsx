@@ -15,6 +15,7 @@ import Progress from "./pages/Progress";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Onboarding from "./pages/Onboarding";
+import GoalSettings from "./pages/GoalSettings";  // <-- keep only this one
 
 import "./index.css";
 
@@ -23,17 +24,15 @@ const router = createBrowserRouter([
       { path: "login", element: <Login /> },
       { path: "register", element: <Register /> },
     ]},
-  // Everything below requires auth
   { element: <Protected />, children: [
-      // Onboarding is protected by auth, but OUTSIDE the gate
       { path: "/onboarding", element: <Onboarding /> },
-      // The rest is gated on profile completion
       { element: <ProfileGate />, children: [
           { path: "/", element: <Layout />, children: [
               { index: true, element: <Dashboard /> },
               { path: "workouts", element: <WorkoutPlan /> },
               { path: "meals", element: <MealPlan /> },
               { path: "progress", element: <Progress /> },
+              { path: "settings/goal", element: <GoalSettings /> }, // new page
           ]},
       ]},
   ]},

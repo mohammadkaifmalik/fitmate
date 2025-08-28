@@ -1,3 +1,4 @@
+// client/src/pages/Login.jsx
 import React from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -15,9 +16,11 @@ export default function Login() {
     setBusy(true);
     setMsg("Signing in…");
     try {
-      const u = await login(form.email, form.password); // AuthContext fetches /auth/me
-      if (u?.profile?.isComplete) nav("/", { replace: true });
-      else nav("/onboarding", { replace: true });
+      const u = await login(form.email, form.password); // fetches /auth/me
+      const complete = Boolean(u?.profile?.isComplete);
+      if (complete) localStorage.setItem("fitmate_onboarded", "1");
+      else localStorage.removeItem("fitmate_onboarded");
+      nav(complete ? "/" : "/onboarding", { replace: true });
     } catch (err) {
       console.error(err);
       setMsg(err?.response?.data?.error || err?.message || "Unable to sign in");
@@ -34,16 +37,16 @@ export default function Login() {
           <div>
             <label className="block text-sm font-medium">Email</label>
             <input className="mt-1 w-full border rounded-xl px-3 py-2"
-              type="email" value={form.email}
-              onChange={e=>setForm(f=>({...f, email:e.target.value}))} required />
+                   type="email" value={form.email}
+                   onChange={e=>setForm(f=>({...f, email:e.target.value}))} required />
           </div>
           <div>
             <label className="block text-sm font-medium">Password</label>
             <input className="mt-1 w-full border rounded-xl px-3 py-2"
-              type="password" value={form.password}
-              onChange={e=>setForm(f=>({...f, password:e.target.value}))} required />
+                   type="password" value={form.password}
+                   onChange={e=>setForm(f=>({...f, password:e.target.value}))} required />
           </div>
-          <button disabled={busy} className="w-full px-4 py-2 rounded-xl bg-slate-900 text-white disabled:opacity-60">
+          <button className="w-full px-4 py-2 rounded-xl bg-slate-900 text-white disabled:opacity-60" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
           {msg && <div className="text-sm text-slate-600">{msg}</div>}
