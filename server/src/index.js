@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -10,6 +11,8 @@ import workoutRoutes from "./routes/workouts.js";
 import mealRoutes from "./routes/meals.js";
 import progressRoutes from "./routes/progress.js";
 import profileRoutes from "./routes/profile.js";
+import debugRoutes from "./routes/debug.js";
+import planRoutes from "./routes/plan.js";
 
 dotenv.config();
 
@@ -26,6 +29,10 @@ app.use("/api/workouts", workoutRoutes);
 app.use("/api/meals", mealRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/debug", debugRoutes);
+app.use("/api/plan", planRoutes);
+
+
 
 const PORT = process.env.PORT || 4000;
 const MONGO_URI = process.env.MONGO_URI;

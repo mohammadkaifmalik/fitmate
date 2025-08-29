@@ -52,16 +52,14 @@ export default function Onboarding() {
       setMsg("Done! Redirecting…");
       nav("/", { replace: true });
     } catch (err) {
-      console.error(err);
-      setMsg(
-        err?.response?.data?.detail ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "Something went wrong"
-      );
-    } finally {
-      setBusy(false);
-    }
+        const detail = err?.response?.data?.detail;
+        const status = err?.response?.status;
+        setMsg(
+          detail ? detail.slice(0,200) :
+          status === 404 ? "HF model not available to your account. Pick a different model (see README)."
+          : err?.response?.data?.error || "Generation failed"
+        );
+      }
   }
 
   return (

@@ -6,6 +6,7 @@ import User from "../models/User.js";
 import Meal from "../models/Meal.js";
 import Workout from "../models/Workout.js";
 import WeightLog from "../models/WeightLog.js";
+import Groq from "groq-sdk";
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ const profileSchema = z.object({
   preferences: z.array(z.string()).optional().default([]),
   allergies: z.array(z.string()).optional().default([]),
 });
+
 const goalSchema = z.object({
   goal: z.enum(["lose", "gain", "maintain"]),
   regenerate: z.boolean().optional().default(false),
@@ -45,6 +47,19 @@ function calcCaloriesTarget({ gender, heightCm, weightKg, activityLevel, goal, b
   if (goal === "lose") target -= (bmiCategory === "Overweight" || bmiCategory === "Obese") ? 500 : 300;
   if (goal === "gain") target += (bmiCategory === "Underweight") ? 400 : 250;
   return target;
+}
+
+/* ------------------------- Groq client (lazy) ------------------------- */
+let _groq;
+function getGroq() {
+  if (_groq) return _groq;
+  const key = (process.env.GROQ_API_KEY || "").trim();
+  if (!key) {
+    // Make this crystal clear in logs and response
+    throw new Error("GROQ_API_KEY is missing. Add it to server/.env and ensure dotenv is loaded in src/index.js");
+  }
+  _groq = new Groq({ apiKey: key });
+  return _groq;
 }
 
 /* ------------------------- Routes ------------------------- */
@@ -80,43 +95,13 @@ router.post("/", auth, async (req, res) => {
   res.json({ user });
 });
 
-// Generate plans via Hugging Face ONLY (no dummy/fallback)
+/* ------------------------- Generate weekly plan (Groq) ------------------------- */
+// Replaces the old HuggingFace-based route
 router.post("/generate", auth, async (req, res) => {
   const user = await User.findById(req.user.sub).select("name email caloriesTarget profile");
   if (!user?.profile?.isComplete) return res.status(400).json({ error: "Complete profile first" });
 
-  const model = (process.env.HUGGINGFACE_MODEL || "").trim();
-  const key = (process.env.HUGGINGFACE_API_KEY || "").trim();
-  if (!key) return res.status(500).json({ error: "HUGGINGFACE_API_KEY is not set" });
-  if (!model) return res.status(500).json({ error: "HUGGINGFACE_MODEL is not set" });
-
-  const prompt = `
-You are a fitness & nutrition coach. Create a concise JSON plan for one week.
-Output VALID JSON ONLY with this exact schema:
-{
-  "workouts": [
-    {"title":"...", "type":"Strength|Cardio|Flexibility|Other", "durationMin": 20, "dayOffset": 0, "time":"07:00"}
-  ],
-  "meals": [
-    {"name":"...", "calories": 300, "dayOffset": 0, "time":"08:00"}
-  ]
-}
-User:
-- Gender: ${user.profile.gender}
-- Height(cm): ${user.profile.heightCm}
-- Weight(kg): ${user.profile.weightKg}
-- Goal: ${user.profile.goal}
-- Activity: ${user.profile.activityLevel}
-- Preferences: ${user.profile.preferences?.join(", ") || "none"}
-- Allergies: ${user.profile.allergies?.join(", ") || "none"}
-Daily calories target: ${user.caloriesTarget}
-Keep daily calories near target. Provide 5–7 workouts and ~3–4 meals per day for 7 days.
-  `.trim();
-
-  const url = `https://api-inference.huggingface.co/models/${encodeURIComponent(model)}`;
-  const payload = { inputs: prompt, parameters: { max_new_tokens: 1100, temperature: 0.7, return_full_text: false } };
-
-  // Insert parsed plan into DB for the next 7 days (replaces existing)
+  // Helper to insert the returned plan into DB
   async function insertPlan(plan) {
     const now = new Date();
     const end = new Date(now); end.setDate(end.getDate() + 7);
@@ -150,51 +135,71 @@ Keep daily calories near target. Provide 5–7 workouts and ~3–4 meals per day
     return { mealsCreated: insertedMeals.length, workoutsCreated: insertedWorkouts.length };
   }
 
-  async function callHF() {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`, "Content-Type":"application/json" },
-      body: JSON.stringify(payload),
-    });
-    const text = await r.text();
-    return { ok: r.ok, status: r.status, text };
-  }
-  console.log("[/generate] model:", process.env.HUGGINGFACE_MODEL, "key?", !!process.env.HUGGINGFACE_API_KEY);
-  console.log("[/generate] key length:", (process.env.HUGGINGFACE_API_KEY || "").length);
+  // Build a **simple** schema prompt so it matches your existing DB logic
+  const prompt = `
+You are a fitness & nutrition coach. Create a concise one-week plan.
 
+Return VALID JSON ONLY with this exact schema:
+{
+  "workouts": [
+    {"title":"...", "type":"Strength|Cardio|Flexibility|Other", "durationMin": 20, "dayOffset": 0, "time":"07:00"}
+  ],
+  "meals": [
+    {"name":"...", "calories": 300, "dayOffset": 0, "time":"08:00"}
+  ]
+}
 
+User:
+- Gender: ${user.profile.gender}
+- Height(cm): ${user.profile.heightCm}
+- Weight(kg): ${user.profile.weightKg}
+- Goal: ${user.profile.goal}
+- Activity: ${user.profile.activityLevel}
+- Preferences: ${user.profile.preferences?.join(", ") || "none"}
+- Allergies: ${user.profile.allergies?.join(", ") || "none"}
+Daily calories target: ${user.caloriesTarget}
+
+Rules:
+- Provide 5–7 workouts over the week (mix types; durations 20–60 min).
+- Provide ~3–4 meals per day for 7 days (keep near target calories overall).
+- Use dayOffset 0..6 (0=Today).
+- Use 24h times like "07:00" / "19:30".
+- Respect preferences/allergies; keep meals simple/affordable.
+`.trim();
 
   try {
-    let { ok, status, text } = await callHF();
-    if (status === 503 && /loading/i.test(text)) {
-      await new Promise(r => setTimeout(r, 6000));
-      ({ ok, status, text } = await callHF());
-    }
-    if (!ok) {
-      console.error("HF error:", status, text.slice(0, 400));
-      return res.status(502).json({ error: "HF request failed", status, detail: text.slice(0, 2000) });
-    }
+    const groq = getGroq();
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: "You are Fitmate’s planning engine. Output STRICT JSON only." },
+        { role: "user", content: prompt }
+      ]
+    });
 
-    // The HF API may wrap output; extract/parse JSON robustly
-    let jsonStr;
+    const content = completion.choices?.[0]?.message?.content || "{}";
+    let plan;
     try {
-      const maybe = JSON.parse(text);
-      jsonStr = Array.isArray(maybe) && maybe[0]?.generated_text
-        ? maybe[0].generated_text
-        : (maybe.generated_text || text);
-    } catch { jsonStr = text; }
-
-    const match = jsonStr.match(/\{[\s\S]*\}/);
-    const plan = JSON.parse(match ? match[0] : jsonStr);
+      plan = JSON.parse(content);
+    } catch {
+      // As a fallback, extract the first JSON object if any wrapping happened
+      const match = content.match(/\{[\s\S]*\}/);
+      plan = JSON.parse(match ? match[0] : "{}");
+    }
 
     if (!Array.isArray(plan.meals) || !Array.isArray(plan.workouts)) {
       return res.status(422).json({ error: "Model output invalid", detail: "Missing 'meals' or 'workouts' arrays" });
     }
 
     const totals = await insertPlan(plan);
-    return res.json({ ok: true, via: "huggingface", ...totals });
+    return res.json({ ok: true, via: "groq", ...totals });
   } catch (e) {
-    console.error("Generate error:", e.stack || e.message);
+    console.error("Generate (groq) error:", e.stack || e.message);
+    if (String(e.message || "").includes("GROQ_API_KEY")) {
+      return res.status(500).json({ error: "GROQ_API_KEY missing", detail: "Add GROQ_API_KEY to server/.env and ensure dotenv is loaded (import 'dotenv/config') in src/index.js" });
+    }
     return res.status(500).json({ error: "Failed to generate plan", detail: e.message });
   }
 });
