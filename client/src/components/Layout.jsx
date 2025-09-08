@@ -26,21 +26,24 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex bg-slate-100">
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-64 bg-slate-900 text-white flex-col p-4">
-        <Link to="/" className="flex items-center gap-2 px-2 py-4">
-          <Logo />
-          <span className="text-2xl font-semibold">FitMate</span>
-        </Link>
-        <nav className="mt-6 space-y-2">
-          <NavItem to="/" label="Dashboard" />
-          <NavItem to="/workouts" label="Workout Plan" />
-          <NavItem to="/meals" label="Meal Plan" />
-          <NavItem to="/progress" label="Progress" />
-        </nav>
-        <div className="mt-auto text-xs text-slate-400 px-2 py-4">
-          © {new Date().getFullYear()} FitMate
-        </div>
-      </aside>
+      {/* Desktop sidebar */}
+<aside className="hidden md:flex w-64 bg-slate-900 text-white flex-col p-4 sticky top-0 h-screen">
+  <Link to="/" className="flex items-center gap-2 px-2 py-4">
+    <Logo />
+    <span className="text-2xl font-semibold">FitMate</span>
+  </Link>
+  <nav className="mt-6 space-y-2">
+    <NavItem to="/" label="Dashboard" />
+    <NavItem to="/workouts" label="Workout Plan" />
+    <NavItem to="/meals" label="Meal Plan" />
+    <NavItem to="/progress" label="Progress" />
+    <NavItem to="/settings/goal" label="Goal settings" />
+  </nav>
+  <div className="mt-auto text-xs text-slate-400 px-2 py-4">
+    © {new Date().getFullYear()} FitMate
+  </div>
+</aside>
+
 
       {/* Mobile overlay + sidebar (mounted only when open) */}
       {sidebarOpen && (
@@ -73,6 +76,7 @@ export default function Layout() {
             <NavItem to="/workouts" label="Workout Plan" />
             <NavItem to="/meals" label="Meal Plan" />
             <NavItem to="/progress" label="Progress" />
+            <NavItem to="/settings/goal" label="Goal settings" />
           </nav>
         </aside>
       )}

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Card from "../components/Card";
 import { api } from "../lib/api";
+import { upsertWeight } from "../api/progress";
 import ProgressUpdatePanel from "../components/ProgressUpdatePanel";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -16,6 +17,10 @@ export default function Progress() {
   const [summary, setSummary] = useState(null);
   const [err, setErr] = useState("");
 
+  // NEW: local state for back-dated entry
+  const [entryDate, setEntryDate] = useState(() => new Date().toISOString().slice(0, 10)); // yyyy-mm-dd
+  const [entryWeight, setEntryWeight] = useState("");
+
   const fetchAll = useCallback(async () => {
     try {
       const [a, b] = await Promise.all([
@@ -30,15 +35,69 @@ export default function Progress() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // NEW: save past entry
+  async function handleSavePast() {
+    if (!entryDate || !entryWeight || Number(entryWeight) <= 0) {
+      setErr("Enter a valid date and weight (kg).");
+      return;
+    }
+    try {
+      await upsertWeight({ date: entryDate, weightKg: Number(entryWeight) });
+      setErr("");
+      // Refresh chart + summary
+      await fetchAll();
+    } catch (e) {
+      setErr(e?.response?.data?.error || e.message || "Failed to save past entry");
+    }
+  }
 
   return (
     <div className="space-y-6">
-      {/* NEW: Update panel */}
+      {/* NEW: Update section (existing) */}
       <Card title="Update">
         <ProgressUpdatePanel onRefreshAll={fetchAll} />
+      </Card>
+
+      {/* NEW: Back-date a weight entry */}
+      <Card title="Add/Update Past Weight">
+        <div className="grid sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-sm font-medium mb-1">Date</label>
+            <input
+              type="date"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              value={entryDate}
+              onChange={(e)=>setEntryDate(e.target.value)}
+              max={new Date().toISOString().slice(0,10)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Weight (kg)</label>
+            <input
+              type="number"
+              step="0.1"
+              min="1"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              value={entryWeight}
+              onChange={(e)=>setEntryWeight(e.target.value)}
+              placeholder="e.g. 72.5"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={handleSavePast}
+              className="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+        {err && <div className="text-sm text-red-600 mt-2">{err}</div>}
+        <p className="text-xs text-slate-500 mt-2">
+          This will create or update your entry for the selected day (one entry per day).
+        </p>
       </Card>
 
       <Card title="Weight Trend (90 days)">
@@ -51,8 +110,8 @@ export default function Progress() {
         ) : (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={logs.map((l) => ({ ...l, label: fmt(l.date) }))}>
-                <CartesianGrid strokeDasharray="3 3" />
+            <LineChart data={logs.map((l) => ({ ...l, label: fmt(l.createdAt || l.date) }))}>
+            <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="label" />
                 <YAxis />
                 <Tooltip />
@@ -66,24 +125,10 @@ export default function Progress() {
       <Card title="Summary">
         {summary ? (
           <div className="grid md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <div className="text-slate-600">Start</div>
-              <div className="text-lg font-semibold">{summary.startWeightKg ?? "—"} kg</div>
-            </div>
-            <div>
-              <div className="text-slate-600">Latest</div>
-              <div className="text-lg font-semibold">{summary.latestWeightKg ?? "—"} kg</div>
-            </div>
-            <div>
-              <div className="text-slate-600">Change</div>
-              <div className="text-lg font-semibold">{summary.deltaKg ?? 0} kg</div>
-            </div>
-            <div>
-              <div className="text-slate-600">BMI</div>
-              <div className="text-lg font-semibold">
-                {summary.bmi ?? "—"} ({summary.bmiCategory ?? "—"})
-              </div>
-            </div>
+            <div><div className="text-slate-600">Start</div><div className="text-lg font-semibold">{summary.startWeightKg ?? "—"} kg</div></div>
+            <div><div className="text-slate-600">Latest</div><div className="text-lg font-semibold">{summary.latestWeightKg ?? "—"} kg</div></div>
+            <div><div className="text-slate-600">Change</div><div className="text-lg font-semibold">{summary.deltaKg ?? 0} kg</div></div>
+            <div><div className="text-slate-600">BMI</div><div className="text-lg font-semibold">{summary.bmi ?? "—"} ({summary.bmiCategory ?? "—"})</div></div>
           </div>
         ) : (
           <div className="py-4 text-slate-600 text-sm">Loading…</div>
