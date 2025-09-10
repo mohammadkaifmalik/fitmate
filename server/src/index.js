@@ -29,7 +29,7 @@ if (process.env.NODE_ENV !== "production") {
 /* ---------- CORS ---------- */
 // Allow your Vercel app + local dev
 const allowedOrigins = [
-  "https://<your-frontend>.vercel.app", // TODO: replace with real domain
+  "https://fitmate-rho.vercel.app/", // TODO: replace with real domain
   "http://localhost:5173"
 ];
 
