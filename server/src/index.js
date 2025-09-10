@@ -74,6 +74,9 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/debug', debugRoutes);
 app.use('/api/plan', planRoutes);
+/* for tem not touching the frontend at the moment */
+
+app.use('/auth', authRoutes);
 
 /* ---------- Startup ---------- */
 const PORT = process.env.PORT || 4000;
