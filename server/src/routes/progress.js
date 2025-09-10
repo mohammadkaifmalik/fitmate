@@ -4,6 +4,7 @@ import { z } from "zod";
 import auth from "../middleware/auth.js";
 import WeightLog from "../models/WeightLog.js";
 import User from "../models/User.js";
+import Meal from "../models/Meal.js";
 
 const router = express.Router();
 
@@ -103,5 +104,36 @@ router.get("/summary", auth, async (req, res) => {
     bmiCategory: latest.bmiCategory,
   });
 });
+// ✅ 4) Daily calorie intake from consumed meals
+router.get("/calories", auth, async (req, res) => {
+  const days = parseInt(req.query.days || "90", 10);
+
+  // start-of-day 'since'
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  since.setHours(0, 0, 0, 0);
+
+  // fetch consumed meals in range
+  const meals = await Meal.find({
+    userId: req.user.sub,
+    consumed: true,
+    eatenAt: { $gte: since }
+  }).sort({ eatenAt: 1 });
+
+  // group by calendar day
+  const byDay = new Map(); // key -> { date, calories }
+  for (const m of meals) {
+    const d = new Date(m.eatenAt);
+    d.setHours(0, 0, 0, 0);
+    const key = d.toISOString();
+
+    const prev = byDay.get(key)?.calories || 0;
+    byDay.set(key, { date: d, calories: prev + (m.calories || 0) });
+  }
+
+  const logs = [...byDay.values()].sort((a, b) => a.date - b.date);
+  res.json({ logs });
+});
+
 
 export default router;

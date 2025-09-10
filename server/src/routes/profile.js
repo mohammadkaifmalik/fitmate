@@ -101,39 +101,42 @@ router.post("/generate", auth, async (req, res) => {
   const user = await User.findById(req.user.sub).select("name email caloriesTarget profile");
   if (!user?.profile?.isComplete) return res.status(400).json({ error: "Complete profile first" });
 
-  // Helper to insert the returned plan into DB
-  async function insertPlan(plan) {
-    const now = new Date();
-    const end = new Date(now); end.setDate(end.getDate() + 7);
+  // Helper to insert the returned plan into DB for 7 days starting at baseDate
+async function insertPlan(plan, baseDate = new Date()) {
+  const base = new Date(baseDate);
+  base.setHours(0,0,0,0);
+  const end = new Date(base); end.setDate(end.getDate() + 7);
 
-    await Meal.deleteMany({ userId: user.id, eatenAt: { $gte: now, $lte: end } });
-    await Workout.deleteMany({ userId: user.id, scheduledAt: { $gte: now, $lte: end } });
+  // delete any existing future plan that overlaps the 7-day window
+  await Meal.deleteMany({ userId: user.id, eatenAt: { $gte: base, $lt: end } });
+  await Workout.deleteMany({ userId: user.id, scheduledAt: { $gte: base, $lt: end } });
 
-    const mealsToCreate = (plan.meals || []).slice(0, 28).map((m) => {
-      const d = new Date(now); d.setDate(d.getDate() + (m.dayOffset || 0));
-      const [h, min] = String(m.time || "08:00").split(":").map((n) => parseInt(n));
-      d.setHours(h || 8, min || 0, 0, 0);
-      return {
-        userId: user.id,
-        name: String(m.name || "Meal"),
-        calories: Math.max(0, Math.round(Number(m.calories) || 0)),
-        eatenAt: d
-      };
-    });
+  const mealsToCreate = (plan.meals || []).slice(0, 42).map((m) => {
+    const d = new Date(base); d.setDate(d.getDate() + (m.dayOffset || 0));
+    const [h, min] = String(m.time || "08:00").split(":").map((n) => parseInt(n));
+    d.setHours(h || 8, min || 0, 0, 0);
+    return {
+      userId: user.id,
+      name: String(m.name || "Meal"),
+      description: String(m.description || ""),  // ✅ save description
+      calories: Math.max(0, Math.round(Number(m.calories) || 0)),
+      eatenAt: d
+    };
+  });
 
-    const workoutsToCreate = (plan.workouts || []).slice(0, 14).map((w) => {
-      const d = new Date(now); d.setDate(d.getDate() + (w.dayOffset || 0));
-      const [h, min] = String(w.time || "07:00").split(":").map((n) => parseInt(n));
-      d.setHours(h || 7, min || 0, 0, 0);
-      const type = ["Strength","Cardio","Flexibility","Other"].includes(w.type) ? w.type : "Other";
-      const duration = Math.max(10, Math.min(120, parseInt(w.durationMin) || 45));
-      return { userId: user.id, title: String(w.title || "Workout"), durationMin: duration, type, scheduledAt: d };
-    });
+  const workoutsToCreate = (plan.workouts || []).slice(0, 21).map((w) => {
+    const d = new Date(base); d.setDate(d.getDate() + (w.dayOffset || 0));
+    const [h, min] = String(w.time || "07:00").split(":").map((n) => parseInt(n));
+    d.setHours(h || 7, min || 0, 0, 0);
+    const type = ["Strength","Cardio","Flexibility","Other"].includes(w.type) ? w.type : "Other";
+    const duration = Math.max(10, Math.min(120, parseInt(w.durationMin) || 45));
+    return { userId: user.id, title: String(w.title || "Workout"), durationMin: duration, type, scheduledAt: d };
+  });
 
-    const insertedMeals = mealsToCreate.length ? await Meal.insertMany(mealsToCreate) : [];
-    const insertedWorkouts = workoutsToCreate.length ? await Workout.insertMany(workoutsToCreate) : [];
-    return { mealsCreated: insertedMeals.length, workoutsCreated: insertedWorkouts.length };
-  }
+  const insertedMeals = mealsToCreate.length ? await Meal.insertMany(mealsToCreate) : [];
+  const insertedWorkouts = workoutsToCreate.length ? await Workout.insertMany(workoutsToCreate) : [];
+  return { mealsCreated: insertedMeals.length, workoutsCreated: insertedWorkouts.length };
+}
 
   // Build a **simple** schema prompt so it matches your existing DB logic
   const prompt = `
@@ -145,7 +148,7 @@ Return VALID JSON ONLY with this exact schema:
     {"title":"...", "type":"Strength|Cardio|Flexibility|Other", "durationMin": 20, "dayOffset": 0, "time":"07:00"}
   ],
   "meals": [
-    {"name":"...", "calories": 300, "dayOffset": 0, "time":"08:00"}
+    {"name":"...", "description":"...", "calories": 300, "dayOffset": 0, "time":"08:00"}
   ]
 }
 
@@ -161,10 +164,12 @@ Daily calories target: ${user.caloriesTarget}
 
 Rules:
 - Provide 5–7 workouts over the week (mix types; durations 20–60 min).
-- Provide ~3–4 meals per day for 7 days (keep near target calories overall).
-- Use dayOffset 0..6 (0=Today).
-- Use 24h times like "07:00" / "19:30".
-- Respect preferences/allergies; keep meals simple/affordable.
+- Provide 4–6 meals per day for 7 days (use snacks when needed).
+- Keep each day’s total within ±8% of the daily target (do not undershoot).
+- Each meal MUST include a short "description" (ingredients or why it’s healthy).
+- Use dayOffset 0..6 (0=base day).
+- Use 24h times e.g. "07:00" / "10:30" / "13:00" / "16:00" / "19:30" / "21:00".
+- Respect preferences/allergies; keep meals simple and affordable.
 `.trim();
 
   try {

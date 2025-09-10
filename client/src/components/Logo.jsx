@@ -1,9 +1,11 @@
 import React from "react";
 
-export default function Logo() {
+export default function Logo({ size = "h-9", className = "" }) {
   return (
-    <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center text-white font-bold">
-      FM
-    </div>
+    <img
+      src="/logo.png"  // make sure your file is public/logo.png
+      alt="FitMate Logo"
+      className={`${size} w-auto ${className}`}
+    />
   );
 }
