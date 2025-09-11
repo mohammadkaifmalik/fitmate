@@ -26,37 +26,36 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
-/* ---------- CORS (Vercel frontend + local dev + optional previews) ---------- */
+/* ---------- CORS (auto-mirror request headers) ---------- */
 const allowedOrigins = [
-  'https://fitmate-rho.vercel.app',            // ✅ your production frontend (no trailing slash)
-  'http://localhost:5173',                      // local Vite dev
-  /^https:\/\/[a-z0-9-]+--fitmate-rho\.vercel\.app$/i // optional: Vercel preview URLs for this project
+  'https://fitmate-rho.vercel.app',                 // prod frontend (no trailing slash)
+  'http://localhost:5173',                           // local dev
+  /^https:\/\/[a-z0-9-]+--fitmate-rho\.vercel\.app$/i // optional: Vercel previews
 ];
 
 const corsOptions = {
   origin(origin, cb) {
-    // Allow tools like curl/Postman (no Origin header)
+    // Allow non-browser tools (no Origin header)
     if (!origin) return cb(null, true);
     const ok = allowedOrigins.some(rule =>
       typeof rule === 'string' ? rule === origin : rule.test?.(origin)
     );
-    // When `ok` is false, CORS headers are omitted (browser blocks) but we don't 500
+    // Do not throw; returning (null, false) omits CORS headers (browser blocks)
     return cb(null, ok);
   },
-  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  // NOTE: no `allowedHeaders` here — cors will echo Access-Control-Request-Headers automatically
   credentials: false,            // set to true ONLY if you use cookies for auth
   optionsSuccessStatus: 204
 };
 
-// Help caches vary by Origin properly
+// Help caches vary correctly by origin and requested headers
 app.use((req, res, next) => {
-  res.header('Vary', 'Origin');
+  res.header('Vary', 'Origin, Access-Control-Request-Headers');
   next();
 });
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // ✅ handle preflight cleanly
+app.options('*', cors(corsOptions)); // handle preflight cleanly
 
 /* ---------- Health check ---------- */
 app.get('/health', (_req, res) =>
@@ -74,8 +73,8 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/debug', debugRoutes);
 app.use('/api/plan', planRoutes);
-/* for tem not touching the frontend at the moment */
 
+/* TEMP: keep /auth without /api so existing calls continue to work */
 app.use('/auth', authRoutes);
 
 /* ---------- Startup ---------- */
