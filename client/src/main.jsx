@@ -16,9 +16,6 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Onboarding from "./pages/Onboarding";
 import GoalSettings from "./pages/GoalSettings";
-import GoalSettings from "./pages/GoalSettings";
-
-
 
 import "./index.css";
 
