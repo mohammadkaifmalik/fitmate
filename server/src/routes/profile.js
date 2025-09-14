@@ -128,10 +128,33 @@ async function insertPlan(plan, baseDate = new Date()) {
     const d = new Date(base); d.setDate(d.getDate() + (w.dayOffset || 0));
     const [h, min] = String(w.time || "07:00").split(":").map((n) => parseInt(n));
     d.setHours(h || 7, min || 0, 0, 0);
+  
     const type = ["Strength","Cardio","Flexibility","Other"].includes(w.type) ? w.type : "Other";
     const duration = Math.max(10, Math.min(120, parseInt(w.durationMin) || 45));
-    return { userId: user.id, title: String(w.title || "Workout"), durationMin: duration, type, scheduledAt: d };
+  
+    const exercises = Array.isArray(w.exercises) ? w.exercises.map((ex, idx) => ({
+      name: String(ex.name || "Exercise"),
+      sets: Number.isFinite(ex.sets) ? ex.sets : undefined,
+      reps: Number.isFinite(ex.reps) ? ex.reps : undefined,
+      durationSec: Number.isFinite(ex.durationSec) ? ex.durationSec : undefined,
+      restSec: Number.isFinite(ex.restSec) ? ex.restSec : 60,
+      notes: ex.notes ? String(ex.notes) : undefined,
+      order: Number.isFinite(ex.order) ? ex.order : idx + 1
+    })) : [];
+  
+    return {
+      userId: user.id,
+      title: String(w.title || "Workout"),
+      durationMin: duration,
+      type,
+      scheduledAt: d,
+      goal: user.profile.goal,     // "lose" | "gain" | "maintain"
+      bmiAtPlan: user.profile.bmi, // snapshot
+      notes: w.notes ? String(w.notes) : undefined,
+      exercises
+    };
   });
+  
 
   const insertedMeals = mealsToCreate.length ? await Meal.insertMany(mealsToCreate) : [];
   const insertedWorkouts = workoutsToCreate.length ? await Workout.insertMany(workoutsToCreate) : [];
@@ -145,10 +168,28 @@ You are a fitness & nutrition coach. Create a concise one-week plan.
 Return VALID JSON ONLY with this exact schema:
 {
   "workouts": [
-    {"title":"...", "type":"Strength|Cardio|Flexibility|Other", "durationMin": 20, "dayOffset": 0, "time":"07:00"}
+    {
+      "title":"...",
+      "type":"Strength|Cardio|Flexibility|Other",
+      "durationMin": 40,
+      "dayOffset": 0,
+      "time":"07:00",
+      "notes":"optional",
+      "exercises": [
+        {
+          "name":"string",
+          "sets": 3,
+          "reps": 12,
+          "durationSec": 0,
+          "restSec": 60,
+          "notes":"optional",
+          "order": 1
+        }
+      ]
+    }
   ],
   "meals": [
-    {"name":"...", "description":"...", "calories": 300, "dayOffset": 0, "time":"08:00"}
+    { "name":"...", "description":"...", "calories": 300, "dayOffset": 0, "time":"08:00" }
   ]
 }
 
@@ -156,21 +197,27 @@ User:
 - Gender: ${user.profile.gender}
 - Height(cm): ${user.profile.heightCm}
 - Weight(kg): ${user.profile.weightKg}
-- Goal: ${user.profile.goal}
+- BMI: ${user.profile.bmi} (${user.profile.bmiCategory})
+- Goal: ${user.profile.goal}  // one of "lose" | "gain" | "maintain"
 - Activity: ${user.profile.activityLevel}
 - Preferences: ${user.profile.preferences?.join(", ") || "none"}
 - Allergies: ${user.profile.allergies?.join(", ") || "none"}
 Daily calories target: ${user.caloriesTarget}
 
 Rules:
-- Provide 5–7 workouts over the week (mix types; durations 20–60 min).
-- Provide 4–6 meals per day for 7 days (use snacks when needed).
-- Keep each day’s total within ±8% of the daily target (do not undershoot).
-- Each meal MUST include a short "description" (ingredients or why it’s healthy).
-- Use dayOffset 0..6 (0=base day).
-- Use 24h times e.g. "07:00" / "10:30" / "13:00" / "16:00" / "19:30" / "21:00".
+- Workouts: provide 5–7 sessions over the week (mix Strength/Cardio/Flexibility; 40–120 min).
+- Each workout MUST include "exercises" with either (sets+reps) OR durationSec; include restSec (default 60 if omitted).
+- Tailor by goal & BMI:
+  - goal="lose" OR BMI>=25 → circuits/supersets, slightly higher reps, include short cardio.
+  - goal="gain" OR BMI<18.5 → hypertrophy ranges, compound lifts, progressive overload cues.
+  - goal="maintain" → balanced mix, moderate intensity.
+- Keep each session near durationMin.
+- Use dayOffset 0..6 and 24h times (e.g., "07:00").
+
+- Meals: keep day kcal within ±8% of the daily target; include a short "description".
 - Respect preferences/allergies; keep meals simple and affordable.
 `.trim();
+
 
   try {
     const groq = getGroq();
