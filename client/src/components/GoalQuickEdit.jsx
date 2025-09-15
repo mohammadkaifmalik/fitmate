@@ -14,7 +14,7 @@ export default function GoalQuickEdit() {
     setMsg("Updating goal…");
     try {
       const r = await api.patch("/profile/goal", { goal: nextGoal, regenerate: regen });
-      setUser(r.data.user); // update in-memory user so UI reflects new target immediately
+      setUser(r.data.user);
       setMsg(regen ? "Goal updated. Regenerating plan…" : "Goal updated.");
       if (regen) {
         await api.post("/profile/generate");

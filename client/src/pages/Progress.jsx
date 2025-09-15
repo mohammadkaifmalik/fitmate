@@ -27,7 +27,7 @@ export default function Progress() {
 
   // back-dated entry
   const [entryDate, setEntryDate] = useState(() =>
-    new Date().toISOString().slice(0, 10) // yyyy-mm-dd
+    new Date().toISOString().slice(0, 10) 
   );
   const [entryWeight, setEntryWeight] = useState("");
 
@@ -67,12 +67,12 @@ export default function Progress() {
 
   // ----- Chart data (merge weight + calories on the same X axis) -----
   const weightSeries = logs.map((l) => {
-    const date = l.createdAt || l.date; // server may return either
+    const date = l.createdAt || l.date; 
     return { date, label: fmt(date), weightKg: l.weightKg };
   });
 
   const calSeries = calLogs.map((l) => {
-    const date = l.date || l.day || l.createdAt || l.eatenAt; // be lenient
+    const date = l.date || l.day || l.createdAt || l.eatenAt; 
     return { date, label: fmt(date), calories: l.calories };
   });
 

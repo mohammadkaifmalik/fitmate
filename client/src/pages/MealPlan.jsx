@@ -1,9 +1,6 @@
-// client/src/pages/MealPlan.jsx
 import React from "react";
 import { api } from "../lib/api";
 import Card from "../components/Card";
-
-// ---- Format helpers ----
 function dayKey(d) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -37,7 +34,7 @@ export default function MealPlan() {
 
   React.useEffect(() => { load(); }, []);
 
-  // Group by calendar day using eatenAt
+  // Group by day
   const grouped = React.useMemo(() => {
     const g = {};
     for (const m of meals) {

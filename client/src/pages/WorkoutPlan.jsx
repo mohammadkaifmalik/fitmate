@@ -6,22 +6,48 @@ import { api } from "../lib/api";
 
 function ExerciseList({ exercises = [] }) {
   if (!exercises.length) return null;
+
   return (
     <ul className="mt-2 space-y-1">
       {exercises
+        // Keep author-set order if provided; default 0 so unspecified items fall to top but stay stable
         .slice()
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-        .map((ex, i) => (
-          <li key={i} className="text-sm leading-6 text-slate-700">
-            <span className="font-medium">{ex.name}</span>
-            {Number.isFinite(ex.sets) && Number.isFinite(ex.reps) && ex.reps > 0 ? (<> — {ex.sets} × {ex.reps}</>) : null}
+        .map((ex, i) => {
+          const hasSetsReps =
+            Number.isFinite(ex?.sets) &&
+            Number.isFinite(ex?.reps) &&
+            ex.reps > 0;
 
-            {Number.isFinite(ex.durationSec) && ex.durationSec > 0 ? (<> — {Math.round(ex.durationSec / 60)} min</>) : null}
+          const hasDuration =
+            Number.isFinite(ex?.durationSec) && ex.durationSec > 0;
 
-            {Number.isFinite(ex.restSec) ? <> (Rest {ex.restSec}s)</> : null}
-            {ex.notes ? <> — <em className="text-slate-500">{ex.notes}</em></> : null}
-          </li>
-        ))}
+          const showRest = Number.isFinite(ex?.restSec);
+
+          return (
+            <li key={i} className="text-sm leading-6 text-slate-700">
+              <span className="font-medium">{ex?.name || "Exercise"}</span>
+
+              {hasSetsReps && (
+                <>
+                  {" "}
+                  — {ex.sets} × {ex.reps}
+                </>
+              )}
+
+              {hasDuration && <> — {Math.round(ex.durationSec / 60)} min</>}
+
+              {showRest && <> (Rest {ex.restSec}s)</>}
+
+              {ex?.notes && (
+                <>
+                  {" "}
+                  — <em className="text-slate-500">{ex.notes}</em>
+                </>
+              )}
+            </li>
+          );
+        })}
     </ul>
   );
 }
@@ -34,22 +60,20 @@ export default function WorkoutPlan() {
   React.useEffect(() => {
     (async () => {
       try {
-        // show everything from start of today
+        // Query a 7-day window starting at the beginning of today
         const fromDate = new Date();
         fromDate.setHours(0, 0, 0, 0);
         const from = fromDate.toISOString();
-
         const to = new Date(Date.now() + 7 * 86400000).toISOString();
 
-        // ✅ ask backend to include exercises/goal/notes
+        // Ask backend to expand embedded exercises
         const res = await api.get("/workouts", {
           params: { from, to, expand: "exercises" },
         });
 
-        // console.log("workouts sample", res.data.workouts?.[0]); // debug if needed
-        setItems(res.data.workouts || []);
+        setItems(res?.data?.workouts || []);
       } catch (e) {
-        setErr(e?.response?.data?.error || e.message);
+        setErr(e?.response?.data?.error || e?.message || "Failed to load");
       } finally {
         setLoading(false);
       }
@@ -73,22 +97,24 @@ export default function WorkoutPlan() {
         ) : (
           <ul className="divide-y">
             {items.map((w) => {
-              const dt = new Date(w.scheduledAt);
-              const when = dt.toLocaleString([], {
-                weekday: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              });
+              const dt = new Date(w?.scheduledAt);
+              const when = Number.isNaN(dt.getTime())
+                ? ""
+                : dt.toLocaleString([], {
+                    weekday: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
 
               return (
                 <li
-                  key={w._id}
+                  key={w?._id || when || Math.random()}
                   className="py-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between"
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <div className="font-medium">{w.title}</div>
-                      {w.goal && (
+                      <div className="font-medium">{w?.title || "Workout"}</div>
+                      {w?.goal && (
                         <span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200">
                           Goal: {w.goal}
                         </span>
@@ -96,14 +122,12 @@ export default function WorkoutPlan() {
                     </div>
 
                     <div className="text-sm text-slate-600">
-                      {w.type} • {w.durationMin} min
+                      {(w?.type || "Session")} • {w?.durationMin ?? "—"} min
                     </div>
 
-                    {/* Exercises */}
-                    <ExerciseList exercises={w.exercises} />
+                    <ExerciseList exercises={w?.exercises} />
 
-                    {/* Optional session notes */}
-                    {w.notes && (
+                    {w?.notes && (
                       <p className="mt-2 text-sm text-slate-500">{w.notes}</p>
                     )}
                   </div>

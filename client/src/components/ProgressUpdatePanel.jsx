@@ -1,4 +1,3 @@
-// client/src/components/ProgressUpdatePanel.jsx
 import { useEffect, useMemo, useState } from "react";
 import { getProfile, saveFullProfile, updateGoal, generatePlan } from "../api/profile";
 
@@ -88,7 +87,7 @@ export default function ProgressUpdatePanel({ onRefreshAll }) {
     setSaving("Activity Level"); setErr("");
     try {
       const payload = { ...profile, activityLevel: activity };
-      await saveFullProfile(payload); // POST /profile expects the full profile shape
+      await saveFullProfile(payload); 
       await regenAfterSave();
       setProfile((p) => (p ? { ...p, activityLevel: activity } : p));
     } catch (e) {

@@ -1,4 +1,3 @@
-// client/src/components/Layout.jsx
 import React from "react";
 import { NavLink, Link, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -25,7 +24,6 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen flex bg-slate-100">
-      {/* Desktop sidebar */}
       {/* Desktop sidebar */}
 <aside className="hidden md:flex w-64 bg-slate-900 text-white flex-col p-4 sticky top-0 h-screen">
   <Link to="/" className="flex items-center gap-2 px-2 py-4">

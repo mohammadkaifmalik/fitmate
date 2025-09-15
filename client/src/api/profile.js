@@ -1,4 +1,3 @@
-// client/src/api/profile.js
 import { api } from "../lib/api";
 
 // GET /api/profile
@@ -12,7 +11,7 @@ export async function getProfile() {
 // POST /api/profile  (expects the full profile payload)
 export async function saveFullProfile(payload) {
   const res = await api.post("/profile", payload);
-  return res.data; // { user }
+  return res.data; 
 }
 
 // PATCH /api/profile/goal

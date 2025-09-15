@@ -1,4 +1,3 @@
-// client/src/api/progress.js
 import { api } from "../lib/api";
 
 // Upsert (create or update) a weight entry for a given date

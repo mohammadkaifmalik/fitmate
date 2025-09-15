@@ -1,4 +1,3 @@
-// client/src/layout/AppLayout.jsx
 import Sidebar from "../components/Sidebar";
 import { Outlet } from "react-router-dom";
 

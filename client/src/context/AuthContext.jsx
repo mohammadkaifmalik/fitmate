@@ -43,7 +43,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem("fitmate_token", t);
     setAuth(t);
     setToken(t);
-    setUser(r.data.user); // we’ll take them to /onboarding after signup
+    setUser(r.data.user);
     return r.data.user;
   }
 
@@ -53,8 +53,6 @@ export function AuthProvider({ children }) {
     setUser(null);
     setToken(null);
   }
-
-  // helper if you want to refresh later
   async function refreshMe() {
     const r = await api.get("/auth/me");
     setUser(r.data.user);
