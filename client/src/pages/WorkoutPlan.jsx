@@ -14,12 +14,10 @@ function ExerciseList({ exercises = [] }) {
         .map((ex, i) => (
           <li key={i} className="text-sm leading-6 text-slate-700">
             <span className="font-medium">{ex.name}</span>
-            {Number.isFinite(ex.sets) && Number.isFinite(ex.reps) ? (
-              <> — {ex.sets} × {ex.reps}</>
-            ) : null}
-            {Number.isFinite(ex.durationSec) ? (
-              <> — {Math.round(ex.durationSec / 60)} min</>
-            ) : null}
+            {Number.isFinite(ex.sets) && Number.isFinite(ex.reps) && ex.reps > 0 ? (<> — {ex.sets} × {ex.reps}</>) : null}
+
+            {Number.isFinite(ex.durationSec) && ex.durationSec > 0 ? (<> — {Math.round(ex.durationSec / 60)} min</>) : null}
+
             {Number.isFinite(ex.restSec) ? <> (Rest {ex.restSec}s)</> : null}
             {ex.notes ? <> — <em className="text-slate-500">{ex.notes}</em></> : null}
           </li>
